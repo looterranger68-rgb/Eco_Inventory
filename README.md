@@ -34,9 +34,11 @@ The demo login is:
 - Email: `seller@ecoinventery.com`
 - Password: `demo1234`
 
-When no `JWT_SECRET` is set in development, the server creates a random,
-temporary secret in memory. If the server restarts, sign in again. Never commit
-a real `.env` file or production secret.
+When no `JWT_SECRET` is set in development, the server creates a random secret
+in the gitignored `data/.jwt-secret` file. This lets demo sessions survive a
+server restart in the same workspace. A fresh sandbox workspace creates its own
+secret, so sign in there once. Never commit a real `.env` file or production
+secret.
 
 ## Production configuration
 
@@ -65,7 +67,7 @@ variables) in the host environment.
 | `DATABASE_TYPE` | no | `sqlite` | `sqlite` or `postgres` |
 | `DATABASE_URL` | only for Postgres URL form | — | PostgreSQL connection string (overrides `PG_*`) |
 | `PG_HOST` / `PG_PORT` / `PG_DATABASE` / `PG_USER` / `PG_PASSWORD` | only for Postgres var form | see `.env.example` | Individual PostgreSQL settings |
-| `JWT_SECRET` | yes in production | random in-memory secret during development | Secret used to sign session JWTs |
+| `JWT_SECRET` | yes in production | random secret saved in gitignored `data/.jwt-secret` during development | Secret used to sign session JWTs |
 | `BASE_URL` | no | current request address | Public URL encoded into product QR codes |
 
 ## API overview
