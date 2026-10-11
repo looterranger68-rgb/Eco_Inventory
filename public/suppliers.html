@@ -20,7 +20,7 @@
       <nav class="main-nav">
         <a href="/index.html" class="nav-link">Dashboard</a>
         <a href="/inventory.html" class="nav-link">Inventory</a>
-        <a href="/ai-insights.html" class="nav-link">AI Copilot</a>
+        <a href="/ai-insights.html" class="nav-link">Inventory Copilot</a>
         <a href="/orders.html" class="nav-link">Orders</a>
         <a href="/suppliers.html" class="nav-link active">Suppliers</a>
         <a href="/settings.html" class="nav-link">Settings</a>
@@ -52,7 +52,7 @@
             <th class="col-numeric">Lead Time</th>
             <th>Terms</th>
             <th class="col-numeric">Supplied SKUs</th>
-            <th class="col-numeric">Holding Value</th>
+            <th class="col-numeric">Listed Stock Value</th>
             <th style="text-align: right;">Actions</th>
           </tr>
         </thead>
@@ -127,7 +127,7 @@
     </div>
   </footer>
 
-  <script src="/js/app.js"></script>
+  <script src="/js/main.js"></script>
   <script>
     let allSuppliers = [];
 
@@ -150,16 +150,16 @@
 
       tbody.innerHTML = suppliers.map(s => `
         <tr>
-          <td style="font-weight: 600;">${s.name}</td>
-          <td>${s.contact_person || '—'}</td>
-          <td style="font-size: 0.82rem; color: var(--text-secondary);">${s.email || ''} ${s.phone ? `(${s.phone})` : ''}</td>
+          <td style="font-weight: 600;">${esc(s.name)}</td>
+          <td>${esc(s.contact_person || '—')}</td>
+          <td style="font-size: 0.82rem; color: var(--text-secondary);">${esc(s.email || '')} ${s.phone ? `(${esc(s.phone)})` : ''}</td>
           <td class="col-numeric col-mono">${s.lead_time_days || 7} days</td>
-          <td><span class="badge badge-neutral">${s.payment_terms || 'Net 30'}</span></td>
+          <td><span class="badge badge-neutral">${esc(s.payment_terms || 'Net 30')}</span></td>
           <td class="col-numeric col-mono">${s.product_count || 0}</td>
           <td class="col-numeric col-mono" style="font-weight: 500;">${formatCurrency(s.inventory_value || 0)}</td>
           <td style="text-align: right; white-space: nowrap;">
-            <button class="btn btn-sm" onclick="openEditSupplier(${s.id})">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="handleDeleteSupplier(${s.id}, '${s.name.replace(/'/g, "\\'")}')">Del</button>
+            <button class="btn btn-sm" onclick="openEditSupplier(${Number(s.id)})">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="handleDeleteSupplier(${Number(s.id)})">Del</button>
           </td>
         </tr>
       `).join('');
@@ -216,8 +216,9 @@
       }
     }
 
-    async function handleDeleteSupplier(id, name) {
-      if (!confirm(`Delete supplier "${name}"?`)) return;
+    async function handleDeleteSupplier(id) {
+      const supplier = allSuppliers.find(item => Number(item.id) === Number(id));
+      if (!supplier || !confirm(`Delete supplier "${supplier.name}"?`)) return;
       try {
         await API.delete(`/api/suppliers/${id}`);
         showToast('Supplier deleted', 'success');

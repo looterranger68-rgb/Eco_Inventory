@@ -1,8 +1,8 @@
 # EcoInventery
 
-Clean, professional inventory & sales management web app for sellers — product
-catalog with shelf-life tracking, QR code labels, and stock insights
-(expiring-soon and underperforming item detection).
+Clean inventory and sales management web app for sellers — product catalog
+with shelf-life tracking, QR code labels, supplier records, order history, and
+stock insights for expiring and slow-moving items.
 
 ## Stack
 
@@ -24,8 +24,10 @@ npm start
 The server listens on port `3000`; open the CodeSandbox preview or visit
 `http://localhost:3000` when running locally. No `.env` file is needed for the
 development demo. The repository includes a sanitized SQLite demo database at
-`data/ecoinventory.db`, with sample products and sales. If the database has no
-products, the server seeds its sample inventory on startup.
+`data/ecoinventory.db`, with sample products and sales. Startup adds the
+supporting supplier, order, stock-history, and per-seller settings tables
+without replacing existing inventory. If the database has no products, the
+server seeds its sample inventory on startup.
 
 The demo login is:
 
@@ -65,7 +67,6 @@ variables) in the host environment.
 | `PG_HOST` / `PG_PORT` / `PG_DATABASE` / `PG_USER` / `PG_PASSWORD` | only for Postgres var form | see `.env.example` | Individual PostgreSQL settings |
 | `JWT_SECRET` | yes in production | random in-memory secret during development | Secret used to sign session JWTs |
 | `BASE_URL` | no | current request address | Public URL encoded into product QR codes |
-| `GEMINI_API_KEY` | no | — | AI features |
 
 ## API overview
 
@@ -81,6 +82,17 @@ variables) in the host environment.
 | `DELETE /api/products/:id` | ✓ | Delete product |
 | `POST /api/products/:id/generate-qr` | ✓ | Generate QR PNG for the public page |
 | `GET /api/insights` | ✓ | Expiring-soon (`?days=N`) & underperforming (`?threshold=X`) lists |
+| `GET /api/suppliers` | ✓ | List the seller's suppliers and linked stock totals |
+| `POST /api/suppliers` | ✓ | Add a supplier |
+| `PUT /api/suppliers/:id` | ✓ | Update a supplier |
+| `DELETE /api/suppliers/:id` | ✓ | Remove a supplier (linked products are kept) |
+| `GET /api/orders` | ✓ | List orders (`?type=sale` or `?type=purchase`) |
+| `POST /api/orders` | ✓ | Record an order and update stock in one transaction |
+| `GET/POST /api/dashboard/settings` | ✓ | Read or save per-seller display settings |
+| `POST /api/ai/forecast` | ✓ | Local stock and recent-sales estimates |
+| `POST /api/ai/query` | ✓ | Local inventory summary answers |
+
+The inventory copilot uses local rules and does not call an external AI model.
 
 Scanning a QR code opens `GET /p/{slug}` — a public, no-auth, mobile-friendly
 product page.

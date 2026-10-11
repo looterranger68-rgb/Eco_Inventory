@@ -20,7 +20,7 @@
       <nav class="main-nav">
         <a href="/index.html" class="nav-link">Dashboard</a>
         <a href="/inventory.html" class="nav-link">Inventory</a>
-        <a href="/ai-insights.html" class="nav-link">AI Copilot</a>
+        <a href="/ai-insights.html" class="nav-link">Inventory Copilot</a>
         <a href="/orders.html" class="nav-link active">Orders</a>
         <a href="/suppliers.html" class="nav-link">Suppliers</a>
         <a href="/settings.html" class="nav-link">Settings</a>
@@ -38,7 +38,7 @@
     <div class="page-header">
       <div class="page-title-group">
         <h1>Transactions & Order Ledger</h1>
-        <p>Customer fulfillment sales, inbound supplier purchase orders, and automatic real-time stock deductions.</p>
+        <p>Record customer sales or supplier purchases and keep stock quantities in sync.</p>
       </div>
       <div class="page-actions">
         <select id="type-filter" class="select-control" onchange="fetchOrders()">
@@ -97,7 +97,7 @@
                 </select>
                 <div style="display: flex; gap: 6px;">
                   <input type="number" class="input-control order-qty-input col-mono" value="1" min="1" placeholder="Qty" style="width: 70px;" required>
-                  <input type="number" step="0.01" class="input-control order-price-input col-mono" placeholder="Price $" style="width: 100px;" required>
+                  <input type="number" step="0.01" min="0" class="input-control order-price-input col-mono" placeholder="Unit price $" style="width: 100px;" required>
                 </div>
               </div>
             </div>
@@ -125,7 +125,7 @@
     </div>
   </footer>
 
-  <script src="/js/app.js"></script>
+  <script src="/js/main.js"></script>
   <script>
     let catalogProducts = [];
 
@@ -149,8 +149,8 @@
       const type = document.getElementById('order-type').value;
       selectEl.innerHTML = '<option value="">Select product...</option>' + 
         catalogProducts.map(p => `
-          <option value="${p.id}" data-cost="${p.cost_price}" data-price="${p.selling_price}" data-stock="${p.quantity}">
-            ${p.sku} - ${p.name} (Stock: ${p.quantity})
+          <option value="${p.id}" data-price="${p.price}" data-stock="${p.quantity}">
+            #${Number(p.id)} - ${esc(p.name)} (Stock: ${Number(p.quantity)})
           </option>
         `).join('');
 
@@ -159,8 +159,9 @@
         const row = e.target.closest('.order-item-row');
         const priceInput = row.querySelector('.order-price-input');
         if (selected && priceInput) {
-          const defaultPrice = type === 'sale' ? selected.dataset.price : selected.dataset.cost;
-          priceInput.value = defaultPrice || '0.00';
+          const defaultPrice = type === 'sale' ? selected.dataset.price : '';
+          priceInput.value = defaultPrice || '';
+          priceInput.placeholder = type === 'sale' ? 'Unit price $' : 'Unit cost $';
         }
       });
     }
@@ -175,7 +176,7 @@
         </select>
         <div style="display: flex; gap: 6px;">
           <input type="number" class="input-control order-qty-input col-mono" value="1" min="1" placeholder="Qty" style="width: 70px;" required>
-          <input type="number" step="0.01" class="input-control order-price-input col-mono" placeholder="Price $" style="width: 100px;" required>
+          <input type="number" step="0.01" min="0" class="input-control order-price-input col-mono" placeholder="Unit price $" style="width: 100px;" required>
           <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.order-item-row').remove()">&times;</button>
         </div>
       `;
@@ -202,17 +203,17 @@
 
       tbody.innerHTML = orders.map(ord => {
         const isSale = ord.type === 'sale';
-        const itemsSummary = (ord.items || []).map(i => `${i.quantity}x ${i.sku || ('#' + i.product_id)}`).join(', ');
+        const itemsSummary = (ord.items || []).map(i => `${i.quantity}x ${esc(i.product_name || ('#' + i.product_id))}`).join(', ');
 
         return `
           <tr>
-            <td class="col-mono" style="font-weight: 600;">${ord.order_number}</td>
+            <td class="col-mono" style="font-weight: 600;">${esc(ord.order_number)}</td>
             <td><span class="badge ${isSale ? 'badge-success' : 'badge-neutral'}">${isSale ? 'Sale' : 'Purchase PO'}</span></td>
-            <td style="font-weight: 500;">${ord.customer_or_vendor}</td>
+            <td style="font-weight: 500;">${esc(ord.customer_or_vendor)}</td>
             <td style="font-size: 0.84rem; color: var(--text-secondary); max-width: 320px;">${itemsSummary || '—'}</td>
             <td class="col-numeric col-mono" style="font-weight: 600;">${formatCurrency(ord.total_amount)}</td>
             <td style="font-size: 0.82rem; color: var(--text-muted);">${formatDate(ord.created_at)}</td>
-            <td><span class="badge badge-neutral">${ord.status}</span></td>
+            <td><span class="badge badge-neutral">${esc(ord.status)}</span></td>
           </tr>
         `;
       }).join('');
@@ -233,7 +234,7 @@
           </select>
           <div style="display: flex; gap: 6px;">
             <input type="number" class="input-control order-qty-input col-mono" value="1" min="1" placeholder="Qty" style="width: 70px;" required>
-            <input type="number" step="0.01" class="input-control order-price-input col-mono" placeholder="Price $" style="width: 100px;" required>
+            <input type="number" step="0.01" min="0" class="input-control order-price-input col-mono" placeholder="Unit price $" style="width: 100px;" required>
           </div>
         </div>
       `;

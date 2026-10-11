@@ -33,11 +33,12 @@ router.get('/', requireAuth, async (req, res) => {
     );
 
     // Units sold per product over the last 30 days (seller-scoped via products)
+    const salesWindow = db.type === 'postgres' ? "s.sale_date >= NOW() - INTERVAL '30 days'" : "s.sale_date >= datetime('now', '-30 days')";
     const soldRows = await db.all(
       `SELECT s.product_id, SUM(s.quantity_sold) AS sold
        FROM sales s
        JOIN products p ON p.id = s.product_id
-       WHERE p.seller_id = $1 AND s.sale_date >= datetime('now', '-30 days')
+       WHERE p.seller_id = $1 AND ${salesWindow}
        GROUP BY s.product_id`,
       [req.seller.id]
     );

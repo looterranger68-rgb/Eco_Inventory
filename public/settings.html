@@ -20,7 +20,7 @@
       <nav class="main-nav">
         <a href="/index.html" class="nav-link">Dashboard</a>
         <a href="/inventory.html" class="nav-link">Inventory</a>
-        <a href="/ai-insights.html" class="nav-link">AI Copilot</a>
+        <a href="/ai-insights.html" class="nav-link">Inventory Copilot</a>
         <a href="/orders.html" class="nav-link">Orders</a>
         <a href="/suppliers.html" class="nav-link">Suppliers</a>
         <a href="/settings.html" class="nav-link active">Settings</a>
@@ -37,7 +37,7 @@
     <div class="page-header">
       <div class="page-title-group">
         <h1>Store & System Configuration</h1>
-        <p>Merchant identity, currency thresholds, and Gemini AI key management.</p>
+        <p>Merchant identity and inventory display settings for this seller account.</p>
       </div>
     </div>
 
@@ -75,16 +75,12 @@
       <!-- AI Configuration -->
       <div class="panel">
         <div class="panel-header">
-          <h2 class="panel-title">AI Engine & Model Configuration</h2>
+          <h2 class="panel-title">AI Engine</h2>
           <span id="ai-status-badge" class="badge badge-neutral">Checking status...</span>
         </div>
         <div class="panel-body">
           <div class="form-group">
-            <label for="set-gemini-key">Google Gemini API Key</label>
-            <input type="password" id="set-gemini-key" class="input-control input-mono" placeholder="Enter Gemini API key to enable live cloud reasoning...">
-            <small style="font-size: 0.76rem; color: var(--text-muted); display: block; margin-top: 4px;">
-              EcoInventory uses hybrid intelligence: when no key is supplied, a deterministic supply chain intelligence engine calculates restocking safety margins, burn rates, and deadstock alerts automatically.
-            </small>
+            <p style="font-size: 0.86rem; color: var(--text-secondary); margin: 0;">Inventory suggestions use local rules based on your saved products and sales. This version does not send your data to an external AI service.</p>
           </div>
         </div>
       </div>
@@ -113,11 +109,11 @@
   <footer class="site-footer">
     <div class="footer-container">
       <span>EcoInventory &copy; 2026</span>
-      <span class="badge badge-neutral">Configuration Saved</span>
+      <span class="badge badge-neutral">Seller settings</span>
     </div>
   </footer>
 
-  <script src="/js/app.js"></script>
+  <script src="/js/main.js"></script>
   <script>
     async function loadSettings() {
       try {
@@ -128,15 +124,12 @@
         if (s.currency) document.getElementById('set-currency').value = s.currency;
         if (s.currency_symbol) document.getElementById('set-currency-symbol').value = s.currency_symbol;
         if (s.low_stock_global_threshold) document.getElementById('set-threshold').value = s.low_stock_global_threshold;
+        if (s.currency_symbol) localStorage.setItem('eco_currency_symbol', s.currency_symbol);
+        if (s.store_name) document.querySelectorAll('.brand-title').forEach(el => { el.textContent = s.store_name; });
 
         const aiBadge = document.getElementById('ai-status-badge');
-        if (s.has_gemini_key) {
-          aiBadge.className = 'badge badge-success';
-          aiBadge.textContent = 'Gemini 1.5 Connected (' + s.gemini_api_key_masked + ')';
-        } else {
-          aiBadge.className = 'badge badge-neutral';
-          aiBadge.textContent = 'Deterministic Local Engine Active';
-        }
+        aiBadge.className = 'badge badge-neutral';
+        aiBadge.textContent = 'Local suggestions only';
 
         // Check health
         const health = await API.get('/api/health');
@@ -156,15 +149,9 @@
         low_stock_global_threshold: parseInt(document.getElementById('set-threshold').value, 10) || 15
       };
 
-      const apiKey = document.getElementById('set-gemini-key').value;
-      if (apiKey && apiKey.trim().length > 0) {
-        payload.gemini_api_key = apiKey.trim();
-      }
-
       try {
         await API.post('/api/dashboard/settings', payload);
         showToast('Settings saved successfully', 'success');
-        document.getElementById('set-gemini-key').value = '';
         await loadSettings();
       } catch (err) {
         showToast('Error saving settings: ' + err.message, 'danger');

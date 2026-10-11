@@ -18,7 +18,7 @@ const COOKIE_OPTIONS = {
 // ----------------------------------------------------------------------------
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, store_name } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, error: 'Name, email, and password are required.' });
@@ -38,6 +38,14 @@ router.post('/register', async (req, res) => {
     );
 
     const sellerId = db.type === 'sqlite' ? result.lastID : result.id;
+    for (const [key, value] of Object.entries({
+      store_name: String(store_name || '').trim() || `${name.trim()}'s Store`,
+      currency: 'USD',
+      currency_symbol: '$',
+      low_stock_global_threshold: '15'
+    })) {
+      await db.run('INSERT INTO store_settings (seller_id, key, value) VALUES ($1, $2, $3)', [sellerId, key, value]);
+    }
     const seller = await db.get('SELECT id, name, email, created_at FROM sellers WHERE id = $1', [sellerId]);
 
     const token = jwt.sign(
@@ -102,7 +110,9 @@ router.post('/login', async (req, res) => {
 // POST /api/auth/logout
 // ----------------------------------------------------------------------------
 router.post('/logout', (req, res) => {
-  res.clearCookie('token', COOKIE_OPTIONS);
+  const clearCookieOptions = { ...COOKIE_OPTIONS };
+  delete clearCookieOptions.maxAge;
+  res.clearCookie('token', clearCookieOptions);
   res.json({ success: true, message: 'Logged out successfully.' });
 });
 

@@ -81,6 +81,13 @@
             <input type="text" id="form-category" class="input-control" required placeholder="e.g. Personal Care">
           </div>
 
+          <div class="form-group">
+            <label for="form-supplier">Supplier (optional)</label>
+            <select id="form-supplier" class="select-control" style="width: 100%;">
+              <option value="">No supplier linked</option>
+            </select>
+          </div>
+
           <div class="form-row">
             <div class="form-group">
               <label for="form-quantity">Stock Quantity</label>
@@ -123,15 +130,27 @@
   <script src="/js/main.js"></script>
   <script>
     let allProducts = [];
+    let allSuppliers = [];
 
     async function fetchProducts() {
       try {
-        const res = await API.get('/api/products');
+        const [res, supplierRes] = await Promise.all([API.get('/api/products'), API.get('/api/suppliers')]);
         allProducts = res.data || [];
+        allSuppliers = supplierRes.data || [];
         renderProducts(allProducts);
+        renderSupplierOptions();
       } catch (err) {
         showToast('Error fetching products: ' + err.message, 'danger');
       }
+    }
+
+    function renderSupplierOptions(selectedId = '') {
+      const select = document.getElementById('form-supplier');
+      if (!select) return;
+      select.innerHTML = '<option value="">No supplier linked</option>' + allSuppliers.map(s =>
+        `<option value="${Number(s.id)}">${esc(s.name)}</option>`
+      ).join('');
+      select.value = selectedId ? String(selectedId) : '';
     }
 
     function renderProducts(products) {
@@ -159,7 +178,7 @@
             <td class="col-mono" ${soon ? 'style="color: var(--warning-text); font-weight: 600;"' : ''}>${fmtDate(p.expiry_date)}</td>
             <td style="text-align: right; white-space: nowrap;">
               <button class="btn btn-sm" onclick="openEditModal(${p.id})">Edit</button>
-              <button class="btn btn-sm btn-dark" onclick="handleDelete(${p.id}, '${esc(p.name).replace(/'/g, '&#39;')}')">Del</button>
+              <button class="btn btn-sm btn-dark" onclick="handleDelete(${Number(p.id)})">Del</button>
             </td>
           </tr>
         `;
@@ -182,6 +201,7 @@
       document.getElementById('product-modal-title').textContent = 'Add New Product';
       document.getElementById('product-form').reset();
       document.getElementById('form-product-id').value = '';
+      renderSupplierOptions();
       clearFormError();
       openModal('product-modal');
     }
@@ -198,6 +218,7 @@
       document.getElementById('form-price').value = p.price;
       document.getElementById('form-mfg-date').value = p.mfg_date ? String(p.mfg_date).slice(0, 10) : '';
       document.getElementById('form-expiry-date').value = p.expiry_date ? String(p.expiry_date).slice(0, 10) : '';
+      renderSupplierOptions(p.supplier_id);
       clearFormError();
       openModal('product-modal');
     }
@@ -220,6 +241,7 @@
         category: document.getElementById('form-category').value,
         quantity: parseInt(document.getElementById('form-quantity').value, 10) || 0,
         price: parseFloat(document.getElementById('form-price').value) || 0,
+        supplier_id: document.getElementById('form-supplier').value || null,
         mfg_date: mfg || null,
         expiry_date: expiry || null
       };
@@ -243,7 +265,10 @@
       }
     }
 
-    async function handleDelete(id, name) {
+    async function handleDelete(id) {
+      const product = allProducts.find(item => Number(item.id) === Number(id));
+      if (!product) return;
+      const name = product.name;
       if (!confirm(`Delete "${name}"? This action cannot be undone.`)) return;
       try {
         await API.delete(`/api/products/${id}`);

@@ -109,6 +109,10 @@ function validateProductInput(body, existing = null) {
   );
   if (price.error) errors.push(price.error);
 
+  const rawSupplierId = body.supplier_id !== undefined ? body.supplier_id : (existing ? existing.supplier_id : null);
+  const supplierId = rawSupplierId === null || rawSupplierId === '' ? null : Number(rawSupplierId);
+  if (supplierId !== null && (!Number.isInteger(supplierId) || supplierId < 1)) errors.push('supplier_id must be a valid supplier.');
+
   if (errors.length > 0) return { errors };
 
   return {
@@ -118,7 +122,8 @@ function validateProductInput(body, existing = null) {
       mfg_date: mfg.value,
       expiry_date: expiry.value,
       quantity: quantity.value === null ? 0 : quantity.value,
-      price: price.value === null ? 0 : price.value
+      price: price.value === null ? 0 : price.value,
+      supplier_id: supplierId
     }
   };
 }
@@ -131,6 +136,11 @@ router.post('/', requireAuth, async (req, res) => {
     const v = validateProductInput(req.body || {});
     if (v.errors) return sendError(res, 400, v.errors.join(' '));
     const data = v.data;
+
+    if (data.supplier_id !== null) {
+      const supplier = await db.get('SELECT id FROM suppliers WHERE id = $1 AND seller_id = $2', [data.supplier_id, req.seller.id]);
+      if (!supplier) return sendError(res, 400, 'Choose a supplier belonging to your account.');
+    }
 
     const dupe = await db.get(
       'SELECT id FROM products WHERE seller_id = $1 AND LOWER(name) = LOWER($2)',
@@ -151,14 +161,14 @@ router.post('/', requireAuth, async (req, res) => {
     slug = `${slug}-${suffix}`;
 
     const result = await db.run(
-      `INSERT INTO products (seller_id, name, category, mfg_date, expiry_date, quantity, price, slug)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [req.seller.id, data.name, data.category, data.mfg_date, data.expiry_date, data.quantity, data.price, slug]
+      `INSERT INTO products (seller_id, name, category, mfg_date, expiry_date, quantity, price, slug, supplier_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [req.seller.id, data.name, data.category, data.mfg_date, data.expiry_date, data.quantity, data.price, slug, data.supplier_id]
     );
 
     const newId = db.type === 'sqlite' ? result.lastID : result.id;
     const created = await db.get(
-      'SELECT id, name, category, mfg_date, expiry_date, quantity, price, slug, qr_code_path, created_at FROM products WHERE id = $1',
+      'SELECT id, name, category, mfg_date, expiry_date, quantity, price, slug, qr_code_path, supplier_id, created_at FROM products WHERE id = $1',
       [newId]
     );
     return res.status(201).json({ success: true, data: created });
@@ -174,7 +184,7 @@ router.post('/', requireAuth, async (req, res) => {
 router.get('/', requireAuth, async (req, res) => {
   try {
     const products = await db.all(
-      `SELECT id, name, category, mfg_date, expiry_date, quantity, price, slug, qr_code_path, created_at
+      `SELECT id, name, category, mfg_date, expiry_date, quantity, price, slug, qr_code_path, supplier_id, created_at
        FROM products WHERE seller_id = $1 ORDER BY id DESC`,
       [req.seller.id]
     );
@@ -215,6 +225,11 @@ router.put('/:id', requireAuth, async (req, res) => {
     if (v.errors) return sendError(res, 400, v.errors.join(' '));
     const data = v.data;
 
+    if (data.supplier_id !== null) {
+      const supplier = await db.get('SELECT id FROM suppliers WHERE id = $1 AND seller_id = $2', [data.supplier_id, req.seller.id]);
+      if (!supplier) return sendError(res, 400, 'Choose a supplier belonging to your account.');
+    }
+
     const dupe = await db.get(
       'SELECT id FROM products WHERE seller_id = $1 AND LOWER(name) = LOWER($2) AND id != $3',
       [req.seller.id, data.name, id]
@@ -223,13 +238,13 @@ router.put('/:id', requireAuth, async (req, res) => {
 
     await db.run(
       `UPDATE products
-       SET name = $1, category = $2, mfg_date = $3, expiry_date = $4, quantity = $5, price = $6
-       WHERE id = $7`,
-      [data.name, data.category, data.mfg_date, data.expiry_date, data.quantity, data.price, id]
+       SET name = $1, category = $2, mfg_date = $3, expiry_date = $4, quantity = $5, price = $6, supplier_id = $7
+       WHERE id = $8 AND seller_id = $9`,
+      [data.name, data.category, data.mfg_date, data.expiry_date, data.quantity, data.price, data.supplier_id, id, req.seller.id]
     );
 
     const updated = await db.get(
-      'SELECT id, name, category, mfg_date, expiry_date, quantity, price, slug, created_at FROM products WHERE id = $1',
+      'SELECT id, name, category, mfg_date, expiry_date, quantity, price, slug, supplier_id, created_at FROM products WHERE id = $1',
       [id]
     );
     return res.json({ success: true, data: updated });
@@ -284,6 +299,10 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     const existing = await db.get('SELECT id FROM products WHERE id = $1 AND seller_id = $2', [id, req.seller.id]);
     if (!existing) return sendError(res, 404, 'Product not found.');
+
+    const hasOrderHistory = await db.get(`SELECT oi.id FROM order_items oi JOIN orders o ON o.id = oi.order_id
+      WHERE oi.product_id = $1 AND o.seller_id = $2 LIMIT 1`, [id, req.seller.id]);
+    if (hasOrderHistory) return sendError(res, 409, 'This product is in order history and cannot be deleted. Set its stock to zero instead.');
 
     await db.run('DELETE FROM products WHERE id = $1', [id]);
     return res.json({ success: true, message: 'Product deleted successfully.' });

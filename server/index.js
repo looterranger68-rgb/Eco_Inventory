@@ -10,10 +10,14 @@ const fs = require('fs');
 const authRouter = require('./routes/auth');
 const productsRouter = require('./routes/products');
 const insightsRouter = require('./routes/insights');
+const suppliersRouter = require('./routes/suppliers');
+const ordersRouter = require('./routes/orders');
 const apiRouter = require('./routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+// The hosted sandbox terminates HTTPS at one proxy before forwarding here.
+app.set('trust proxy', 1);
 
 const allowedOrigins = new Set([
   'http://localhost:3000',
@@ -25,15 +29,18 @@ const allowedOrigins = new Set([
 app.use((req, res, next) => {
   const origin = req.get('origin');
   const forwardedHost = req.get('x-forwarded-host')?.split(',')[0].trim();
-  const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0].trim();
   let matchesForwardedApp = false;
 
   if (origin) {
     try {
       const originUrl = new URL(origin);
-      const appHosts = [req.get('host'), forwardedHost].filter(Boolean);
-      const appProtocol = forwardedProto || req.protocol;
-      matchesForwardedApp = appHosts.includes(originUrl.host) && originUrl.protocol === `${appProtocol}:`;
+      const appHostname = req.hostname.toLowerCase();
+      const appProtocol = `${req.protocol}:`;
+      const publicPort = req.get('x-forwarded-port')?.split(',')[0].trim();
+      const forwardedHostPort = forwardedHost ? new URL(`${appProtocol}//${forwardedHost}`).port : '';
+      const requestPort = publicPort || forwardedHostPort || (originUrl.port ? req.socket.localPort : '');
+      matchesForwardedApp = originUrl.hostname.toLowerCase() === appHostname && originUrl.protocol === appProtocol &&
+        (!originUrl.port || !requestPort || originUrl.port === String(requestPort));
     } catch {
       matchesForwardedApp = false;
     }
@@ -58,6 +65,8 @@ app.use(express.static(publicDir));
 app.use('/api/auth', authRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/insights', insightsRouter);
+app.use('/api/suppliers', suppliersRouter);
+app.use('/api/orders', ordersRouter);
 app.use('/api', apiRouter);
 
 // Public product page routing for QR listings (no auth)
@@ -94,6 +103,10 @@ app.get('/p/:slug', async (req, res) => {
 // Root route
 app.get('/', (req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'online', timestamp: new Date().toISOString(), database_type: db.type, environment: process.env.NODE_ENV || 'development' });
 });
 
 // Minimal HTML escaping for injected template values

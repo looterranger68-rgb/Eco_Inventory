@@ -31,11 +31,42 @@ if (isPostgres) {
       return res.rows[0] || null;
     },
     async run(text, params = []) {
-      const res = await pool.query(text, params);
-      return { rowCount: res.rowCount, lastID: res.rows && res.rows[0] ? res.rows[0].id : null };
+      const insertTable = /^\s*INSERT\s+INTO\s+(\w+)/i.exec(text)?.[1]?.toLowerCase();
+      const tablesWithIds = new Set(['sellers', 'suppliers', 'products', 'orders', 'order_items', 'sales', 'stock_logs']);
+      const query = insertTable && tablesWithIds.has(insertTable) && !/\bRETURNING\b/i.test(text) ? `${text} RETURNING id` : text;
+      const res = await pool.query(query, params);
+      const id = res.rows && res.rows[0] ? res.rows[0].id : null;
+      return { rowCount: res.rowCount, changes: res.rowCount, lastID: id, id };
     },
     async exec(text) {
       return pool.query(text);
+    },
+    async transaction(work) {
+      const client = await pool.connect();
+      const tx = {
+        async all(text, params = []) { return (await client.query(text, params)).rows; },
+        async get(text, params = []) { return (await client.query(text, params)).rows[0] || null; },
+        async run(text, params = []) {
+          const insertTable = /^\s*INSERT\s+INTO\s+(\w+)/i.exec(text)?.[1]?.toLowerCase();
+          const tablesWithIds = new Set(['sellers', 'suppliers', 'products', 'orders', 'order_items', 'sales', 'stock_logs']);
+          const query = insertTable && tablesWithIds.has(insertTable) && !/\bRETURNING\b/i.test(text) ? `${text} RETURNING id` : text;
+          const result = await client.query(query, params);
+          const id = result.rows && result.rows[0] ? result.rows[0].id : null;
+          return { rowCount: result.rowCount, changes: result.rowCount, lastID: id, id };
+        },
+        async exec(text) { return client.query(text); }
+      };
+      try {
+        await client.query('BEGIN');
+        const result = await work(tx);
+        await client.query('COMMIT');
+        return result;
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
     }
   };
 } else {
@@ -44,7 +75,8 @@ if (isPostgres) {
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
-  const dbPath = path.join(dataDir, 'ecoinventory.db');
+  const dbPath = process.env.SQLITE_PATH || path.join(dataDir, 'ecoinventory.db');
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const sqlite = new Database(dbPath);
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('foreign_keys = ON');

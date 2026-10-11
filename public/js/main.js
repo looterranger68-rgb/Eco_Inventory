@@ -9,6 +9,10 @@ function isAuthPage() {
   return /\/(login|register)\.html$/.test(window.location.pathname);
 }
 
+function isPublicPage() {
+  return window.location.pathname === '/' || window.location.pathname === '/index.html';
+}
+
 // Sends credentials (httpOnly JWT cookie) with every request.
 // On 401, protected app pages are bounced to the sign-in page.
 async function apiFetch(url, options = {}) {
@@ -18,7 +22,7 @@ async function apiFetch(url, options = {}) {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
   });
 
-  if (res.status === 401 && !isAuthPage()) {
+  if (res.status === 401 && !isAuthPage() && !isPublicPage()) {
     window.location.href = '/login.html';
     throw new Error('Session expired. Please sign in again.');
   }
@@ -42,7 +46,9 @@ const API = {
 // Currency & Date formatting
 function formatCurrency(num) {
   const n = parseFloat(num) || 0;
-  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let symbol = '$';
+  try { symbol = localStorage.getItem('eco_currency_symbol') || '$'; } catch (e) { /* use the default symbol */ }
+  return symbol + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // Minimal HTML escaping for API values injected into innerHTML templates
@@ -112,6 +118,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       link.classList.remove('active');
     }
   });
+
+  if (!isAuthPage()) {
+    try {
+      const { data: settings } = await API.get('/api/dashboard/settings');
+      if (settings.currency_symbol) localStorage.setItem('eco_currency_symbol', settings.currency_symbol);
+      if (settings.store_name) {
+        document.querySelectorAll('.brand-title').forEach(el => { el.textContent = settings.store_name; });
+      }
+    } catch (e) {
+      // The protected page API below will redirect if the session has expired.
+    }
+  }
 
   // Render header auth state from the live session (httpOnly cookie)
   const userSlot = document.getElementById('nav-user-slot');
