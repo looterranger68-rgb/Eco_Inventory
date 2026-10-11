@@ -22,16 +22,30 @@ const allowedOrigins = new Set([
 ].filter(Boolean));
 
 // Standard middleware
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) {
-      callback(null, true);
-      return;
+app.use((req, res, next) => {
+  const origin = req.get('origin');
+  const forwardedHost = req.get('x-forwarded-host')?.split(',')[0].trim();
+  const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0].trim();
+  let matchesForwardedApp = false;
+
+  if (origin) {
+    try {
+      const originUrl = new URL(origin);
+      const appHosts = [req.get('host'), forwardedHost].filter(Boolean);
+      const appProtocol = forwardedProto || req.protocol;
+      matchesForwardedApp = appHosts.includes(originUrl.host) && originUrl.protocol === `${appProtocol}:`;
+    } catch {
+      matchesForwardedApp = false;
     }
-    callback(new Error('CORS policy does not allow this origin.'));
-  },
-  credentials: true
-}));
+  }
+
+  if (origin && !allowedOrigins.has(origin) && !matchesForwardedApp) {
+    return res.status(403).json({ success: false, error: 'Origin not allowed.' });
+  }
+
+  // Reflect approved origins so cookie-based login works in hosted sandboxes.
+  cors({ origin: origin || false, credentials: true })(req, res, next);
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
