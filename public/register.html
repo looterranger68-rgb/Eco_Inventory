@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account — EcoInventery</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-container">
+      <a href="/index.html" class="brand-wrapper">
+        <span class="brand-mark"></span>
+        <span class="brand-title">EcoInventery</span>
+      </a>
+      <nav class="main-nav">
+        <a href="/index.html" class="nav-link">Home</a>
+        <a href="/login.html" class="nav-link">Sign In</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="app-container">
+    <div class="auth-container">
+      <div class="auth-header">
+        <h1 class="auth-title">Create Seller Account</h1>
+        <p class="auth-desc">Start managing catalog inventory and AI forecasts.</p>
+      </div>
+
+      <form id="register-form" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label for="reg-name">Your Full Name *</label>
+          <input type="text" id="reg-name" class="input-control" required placeholder="e.g. Alex Rivera" style="width: 100%;">
+        </div>
+
+        <div class="form-group">
+          <label for="reg-store">Store / Business Name</label>
+          <input type="text" id="reg-store" class="input-control" placeholder="e.g. Green Earth Collective" style="width: 100%;">
+        </div>
+
+        <div class="form-group">
+          <label for="reg-email">Email Address *</label>
+          <input type="email" id="reg-email" class="input-control" required placeholder="alex@greenearth.com" style="width: 100%;">
+        </div>
+
+        <div class="form-group">
+          <label for="reg-password">Password *</label>
+          <input type="password" id="reg-password" class="input-control" required placeholder="Minimum 6 characters" minlength="6" style="width: 100%;">
+        </div>
+
+        <div style="margin-top: 20px;">
+          <button type="submit" class="btn btn-dark" style="width: 100%;" id="btn-reg">Create Account &rarr;</button>
+        </div>
+      </form>
+
+      <div style="margin-top: 18px; text-align: center; font-size: 0.82rem; color: var(--text-secondary);">
+        Already have an account? <a href="/login.html" style="color: var(--accent); font-weight: 500;">Sign in here</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-container">
+      <span>EcoInventery &copy; 2026</span>
+      <span class="badge badge-neutral">Free Seller Tier</span>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    async function handleRegister(e) {
+      e.preventDefault();
+      const name = document.getElementById('reg-name').value;
+      const store_name = document.getElementById('reg-store').value;
+      const email = document.getElementById('reg-email').value;
+      const password = document.getElementById('reg-password').value;
+      const btn = document.getElementById('btn-reg');
+
+      btn.textContent = 'Setting up account...';
+      btn.setAttribute('disabled', 'true');
+
+      try {
+        await API.post('/api/auth/register', { name, email, password });
+        showToast('Account registered successfully', 'success');
+        setTimeout(() => {
+          window.location.href = '/dashboard.html';
+        }, 300);
+      } catch (err) {
+        showToast(err.message, 'danger');
+      } finally {
+        btn.textContent = 'Create Account →';
+        btn.removeAttribute('disabled');
+      }
+    }
+  </script>
+</body>
+</html>

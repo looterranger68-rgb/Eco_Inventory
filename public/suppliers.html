@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suppliers Directory — EcoInventory</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="site-header">
+    <div class="header-container">
+      <a href="/index.html" class="brand-wrapper">
+        <span class="brand-mark"></span>
+        <span class="brand-title">EcoInventory</span>
+        <span class="brand-tag">Vendors</span>
+      </a>
+
+      <nav class="main-nav">
+        <a href="/index.html" class="nav-link">Dashboard</a>
+        <a href="/inventory.html" class="nav-link">Inventory</a>
+        <a href="/ai-insights.html" class="nav-link">AI Copilot</a>
+        <a href="/orders.html" class="nav-link">Orders</a>
+        <a href="/suppliers.html" class="nav-link active">Suppliers</a>
+        <a href="/settings.html" class="nav-link">Settings</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="btn btn-sm btn-dark" onclick="openSupplierModal()">+ Add Supplier</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+    <div class="page-header">
+      <div class="page-title-group">
+        <h1>Supplier & Vendor Directory</h1>
+        <p>Lead time tracking, payment terms, contact details, and tied SKU valuations.</p>
+      </div>
+    </div>
+
+    <!-- Suppliers Table -->
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Vendor Name</th>
+            <th>Contact Person</th>
+            <th>Email / Phone</th>
+            <th class="col-numeric">Lead Time</th>
+            <th>Terms</th>
+            <th class="col-numeric">Supplied SKUs</th>
+            <th class="col-numeric">Holding Value</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="suppliers-tbody">
+          <tr><td colspan="8" class="empty-state">Loading supplier directory...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Modal: Create / Edit Supplier -->
+  <div id="supplier-modal" class="modal-backdrop">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3 class="modal-title" id="supplier-modal-title">Add Supplier</h3>
+        <button class="modal-close" onclick="closeModal('supplier-modal')">&times;</button>
+      </div>
+      <form id="supplier-form" onsubmit="handleSupplierSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="form-sup-id">
+          
+          <div class="form-group">
+            <label for="form-sup-name">Supplier / Company Name *</label>
+            <input type="text" id="form-sup-name" class="input-control" required placeholder="e.g. Nordic Fibres Ltd">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="form-sup-contact">Contact Person</label>
+              <input type="text" id="form-sup-contact" class="input-control" placeholder="e.g. Astrid Lind">
+            </div>
+            <div class="form-group">
+              <label for="form-sup-lead">Fulfillment Lead Time (Days)</label>
+              <input type="number" id="form-sup-lead" class="input-control col-mono" value="7" min="1">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="form-sup-email">Email</label>
+              <input type="email" id="form-sup-email" class="input-control" placeholder="orders@supplier.com">
+            </div>
+            <div class="form-group">
+              <label for="form-sup-phone">Phone</label>
+              <input type="text" id="form-sup-phone" class="input-control" placeholder="+1 ...">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="form-sup-terms">Payment Terms</label>
+            <input type="text" id="form-sup-terms" class="input-control" value="Net 30" placeholder="e.g. Net 30, Due on Receipt, Net 60">
+          </div>
+
+          <div class="form-group">
+            <label for="form-sup-notes">Notes / Sustainability Certification</label>
+            <input type="text" id="form-sup-notes" class="input-control" placeholder="e.g. FSC Certified packaging partner">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" onclick="closeModal('supplier-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Supplier</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <span>EcoInventory &copy; 2026 — Supplier Operations</span>
+      <span class="badge badge-neutral">Lead Time Intelligence Enabled</span>
+    </div>
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script>
+    let allSuppliers = [];
+
+    async function fetchSuppliers() {
+      try {
+        const res = await API.get('/api/suppliers');
+        allSuppliers = res.data || [];
+        renderSuppliers(allSuppliers);
+      } catch (err) {
+        showToast('Error fetching suppliers: ' + err.message, 'danger');
+      }
+    }
+
+    function renderSuppliers(suppliers) {
+      const tbody = document.getElementById('suppliers-tbody');
+      if (suppliers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No suppliers configured yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = suppliers.map(s => `
+        <tr>
+          <td style="font-weight: 600;">${s.name}</td>
+          <td>${s.contact_person || '—'}</td>
+          <td style="font-size: 0.82rem; color: var(--text-secondary);">${s.email || ''} ${s.phone ? `(${s.phone})` : ''}</td>
+          <td class="col-numeric col-mono">${s.lead_time_days || 7} days</td>
+          <td><span class="badge badge-neutral">${s.payment_terms || 'Net 30'}</span></td>
+          <td class="col-numeric col-mono">${s.product_count || 0}</td>
+          <td class="col-numeric col-mono" style="font-weight: 500;">${formatCurrency(s.inventory_value || 0)}</td>
+          <td style="text-align: right; white-space: nowrap;">
+            <button class="btn btn-sm" onclick="openEditSupplier(${s.id})">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="handleDeleteSupplier(${s.id}, '${s.name.replace(/'/g, "\\'")}')">Del</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openSupplierModal() {
+      document.getElementById('supplier-modal-title').textContent = 'Add Supplier';
+      document.getElementById('form-sup-id').value = '';
+      document.getElementById('supplier-form').reset();
+      openModal('supplier-modal');
+    }
+
+    function openEditSupplier(id) {
+      const s = allSuppliers.find(item => item.id === id);
+      if (!s) return;
+
+      document.getElementById('supplier-modal-title').textContent = `Edit Supplier: ${s.name}`;
+      document.getElementById('form-sup-id').value = s.id;
+      document.getElementById('form-sup-name').value = s.name;
+      document.getElementById('form-sup-contact').value = s.contact_person || '';
+      document.getElementById('form-sup-lead').value = s.lead_time_days || 7;
+      document.getElementById('form-sup-email').value = s.email || '';
+      document.getElementById('form-sup-phone').value = s.phone || '';
+      document.getElementById('form-sup-terms').value = s.payment_terms || 'Net 30';
+      document.getElementById('form-sup-notes').value = s.notes || '';
+      openModal('supplier-modal');
+    }
+
+    async function handleSupplierSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('form-sup-id').value;
+      const payload = {
+        name: document.getElementById('form-sup-name').value,
+        contact_person: document.getElementById('form-sup-contact').value,
+        lead_time_days: parseInt(document.getElementById('form-sup-lead').value, 10) || 7,
+        email: document.getElementById('form-sup-email').value,
+        phone: document.getElementById('form-sup-phone').value,
+        payment_terms: document.getElementById('form-sup-terms').value,
+        notes: document.getElementById('form-sup-notes').value
+      };
+
+      try {
+        if (id) {
+          await API.put(`/api/suppliers/${id}`, payload);
+          showToast('Supplier updated', 'success');
+        } else {
+          await API.post('/api/suppliers', payload);
+          showToast('Supplier added', 'success');
+        }
+        closeModal('supplier-modal');
+        fetchSuppliers();
+      } catch (err) {
+        showToast(err.message, 'danger');
+      }
+    }
+
+    async function handleDeleteSupplier(id, name) {
+      if (!confirm(`Delete supplier "${name}"?`)) return;
+      try {
+        await API.delete(`/api/suppliers/${id}`);
+        showToast('Supplier deleted', 'success');
+        fetchSuppliers();
+      } catch (err) {
+        showToast(err.message, 'danger');
+      }
+    }
+
+    fetchSuppliers();
+  </script>
+</body>
+</html>

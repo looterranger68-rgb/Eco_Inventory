@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Listings & Labels — EcoInventery</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Site Navigation -->
+  <header class="site-header">
+    <div class="header-container">
+      <a href="/index.html" class="brand-wrapper">
+        <span class="brand-mark"></span>
+        <span class="brand-title">EcoInventery</span>
+      </a>
+
+      <nav class="main-nav">
+        <a href="/index.html" class="nav-link">Home</a>
+        <a href="/dashboard.html" class="nav-link">Dashboard</a>
+        <a href="/inventory.html" class="nav-link">Inventory</a>
+        <a href="/insights.html" class="nav-link">AI Insights</a>
+        <a href="/qr-listings.html" class="nav-link">QR Listings</a>
+      </nav>
+
+      <div class="header-actions" id="nav-user-slot"></div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+    <div class="page-header">
+      <div class="page-title-group">
+        <h1>QR Listings &amp; Labels</h1>
+        <p>Create a product and get a printable QR tag that opens its public page when scanned.</p>
+      </div>
+    </div>
+
+    <!-- Create + Generate QR Form -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Create Product &amp; Generate QR</h2>
+      </div>
+      <div class="panel-body">
+        <form id="qr-form" onsubmit="handleCreate(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="qr-name">Product Name *</label>
+              <input type="text" id="qr-name" class="input-control" required placeholder="e.g. Rosemary Shampoo Bar">
+            </div>
+            <div class="form-group">
+              <label for="qr-category">Category *</label>
+              <input type="text" id="qr-category" class="input-control" required placeholder="e.g. Personal Care">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="qr-price">Price ($)</label>
+              <input type="number" step="0.01" min="0" id="qr-price" class="input-control col-mono" value="0.00">
+            </div>
+            <div class="form-group">
+              <label for="qr-quantity">Stock Quantity</label>
+              <input type="number" min="0" id="qr-quantity" class="input-control col-mono" value="0">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="qr-mfg">Mfg Date</label>
+              <input type="date" id="qr-mfg" class="input-control">
+            </div>
+            <div class="form-group">
+              <label for="qr-expiry">Expiry Date</label>
+              <input type="date" id="qr-expiry" class="input-control">
+            </div>
+          </div>
+
+          <div id="qr-form-error" style="display: none; padding: 10px 12px; margin: 12px 0; background-color: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius-sm); color: var(--danger-text); font-size: 0.84rem;"></div>
+
+          <button type="submit" class="btn btn-primary" id="qr-submit-btn">Create &amp; Generate QR</button>
+        </form>
+
+        <!-- Generated QR result -->
+        <div id="qr-result" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-light);">
+          <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+            <img id="qr-result-img" src="" alt="Product QR code" width="160" height="160" style="border: 1px solid var(--border-light); padding: 8px; background: #fff;">
+            <div style="flex: 1; min-width: 200px;">
+              <div style="font-weight: 600; margin-bottom: 4px;" id="qr-result-name"></div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;" id="qr-result-url" class="col-mono"></div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <a id="qr-result-download" class="btn btn-sm btn-dark" download>Download PNG</a>
+                <a id="qr-result-public" class="btn btn-sm" target="_blank" rel="noopener">View Public Page</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Previously Generated Listings -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Generated Listings</h2>
+        <span class="badge badge-neutral" id="listing-count">0</span>
+      </div>
+      <div class="qr-grid" id="qr-grid">
+        <div class="empty-state" style="grid-column: 1 / -1;">Loading…</div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-container">
+      <span>EcoInventery &copy; 2026 — Dynamic QR Tag System</span>
+      <span class="badge badge-neutral">Print &amp; Scan Ready</span>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    function showFormError(msg) {
+      const box = document.getElementById('qr-form-error');
+      box.textContent = msg;
+      box.style.display = 'block';
+    }
+
+    function clearFormError() {
+      const box = document.getElementById('qr-form-error');
+      box.textContent = '';
+      box.style.display = 'none';
+    }
+
+    async function handleCreate(e) {
+      e.preventDefault();
+      clearFormError();
+
+      const mfg = document.getElementById('qr-mfg').value;
+      const expiry = document.getElementById('qr-expiry').value;
+      if (mfg && expiry && expiry <= mfg) {
+        showFormError('Expiry date must be after the manufacturing date.');
+        return;
+      }
+
+      const btn = document.getElementById('qr-submit-btn');
+      btn.setAttribute('disabled', 'true');
+      btn.textContent = 'Generating…';
+
+      try {
+        // 1. Create the product
+        const created = await API.post('/api/products', {
+          name: document.getElementById('qr-name').value,
+          category: document.getElementById('qr-category').value,
+          price: parseFloat(document.getElementById('qr-price').value) || 0,
+          quantity: parseInt(document.getElementById('qr-quantity').value, 10) || 0,
+          mfg_date: mfg || null,
+          expiry_date: expiry || null
+        });
+
+        // 2. Generate its QR code
+        const qr = await API.post(`/api/products/${created.data.id}/generate-qr`, {});
+
+        // 3. Show the result inline
+        document.getElementById('qr-result').style.display = 'block';
+        document.getElementById('qr-result-img').src = qr.data.qr_code_path + '?t=' + Date.now();
+        document.getElementById('qr-result-name').textContent = created.data.name;
+        document.getElementById('qr-result-url').textContent = qr.data.url;
+        const dl = document.getElementById('qr-result-download');
+        dl.href = qr.data.qr_code_path;
+        dl.setAttribute('download', `${created.data.slug}.png`);
+        document.getElementById('qr-result-public').href = `/p/${created.data.slug}`;
+
+        document.getElementById('qr-form').reset();
+        showToast('QR code generated', 'success');
+        await loadListings();
+      } catch (err) {
+        showFormError(err.message);
+      } finally {
+        btn.textContent = 'Create & Generate QR';
+        btn.removeAttribute('disabled');
+      }
+    }
+
+    async function loadListings() {
+      try {
+        const res = await API.get('/api/products');
+        const grid = document.getElementById('qr-grid');
+        const products = res.data || [];
+
+        document.getElementById('listing-count').textContent = products.length;
+
+        if (products.length === 0) {
+          grid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;">No QR listings generated yet. Create your first one above.</div>';
+          return;
+        }
+
+        grid.innerHTML = products.map(p => `
+          <div class="qr-card tilt">
+            ${p.qr_code_path
+              ? `<div class="qr-code-box" data-qrbox><img src="${esc(p.qr_code_path)}?t=${p.id}" alt="QR for ${esc(p.name)}" width="120" height="120" onerror="var b=this.closest('[data-qrbox]');b.textContent='No QR file';b.style.color='var(--text-muted)';b.style.fontSize='0.78rem';"></div>`
+              : `<div class="qr-code-box" style="color: var(--text-muted); font-size: 0.78rem;">No QR yet</div>`
+            }
+            <div style="font-weight: 600; font-size: 0.92rem; margin-bottom: 2px;">${esc(p.name)}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">${esc(p.category)} · ${formatCurrency(p.price)}</div>
+
+            <div style="display: flex; gap: 6px; width: 100%; flex-wrap: wrap; justify-content: center;">
+              ${p.qr_code_path
+                ? `<a class="btn btn-sm" href="/p/${esc(p.slug)}" target="_blank" rel="noopener">View</a>
+                   <a class="btn btn-sm btn-dark" href="${esc(p.qr_code_path)}" download="${esc(p.slug)}.png">Download</a>
+                   <button class="btn btn-sm" data-regen="${p.id}">Regenerate</button>`
+                : `<button class="btn btn-sm btn-primary" data-regen="${p.id}">Generate QR</button>`
+              }
+            </div>
+          </div>
+        `).join('');
+
+        grid.querySelectorAll('[data-regen]').forEach(btn => {
+          btn.addEventListener('click', () => regenerate(parseInt(btn.getAttribute('data-regen'), 10), btn));
+        });
+      } catch (err) {
+        showToast('Error loading listings: ' + err.message, 'danger');
+      }
+    }
+
+    async function regenerate(id, btn) {
+      const original = btn.textContent;
+      btn.textContent = 'Generating…';
+      btn.setAttribute('disabled', 'true');
+      try {
+        const qr = await API.post(`/api/products/${id}/generate-qr`, {});
+        showToast('QR regenerated', 'success');
+        await loadListings();
+      } catch (err) {
+        showToast(err.message, 'danger');
+        btn.textContent = original;
+        btn.removeAttribute('disabled');
+      }
+    }
+
+    loadListings();
+  </script>
+</body>
+</html>

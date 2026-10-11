@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seller Dashboard — EcoInventery</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Site Navigation -->
+  <header class="site-header">
+    <div class="header-container">
+      <a href="/index.html" class="brand-wrapper">
+        <span class="brand-mark"></span>
+        <span class="brand-title">EcoInventery</span>
+      </a>
+
+      <nav class="main-nav">
+        <a href="/index.html" class="nav-link">Home</a>
+        <a href="/dashboard.html" class="nav-link">Dashboard</a>
+        <a href="/inventory.html" class="nav-link">Inventory</a>
+        <a href="/insights.html" class="nav-link">AI Insights</a>
+        <a href="/qr-listings.html" class="nav-link">QR Listings</a>
+      </nav>
+
+      <div class="header-actions" id="nav-user-slot">
+        <!-- Injected by main.js -->
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="app-container">
+    <div class="page-header">
+      <div class="page-title-group">
+        <h1>Seller Overview &amp; Stock Position</h1>
+        <p>A quick health check of your catalog — expiring stock and slow movers at a glance.</p>
+      </div>
+      <div class="page-actions">
+        <button id="btn-refresh" class="btn btn-sm" onclick="loadDashboard()">↻ Refresh</button>
+        <a href="/insights.html" class="btn btn-sm btn-primary">View Full Insights</a>
+      </div>
+    </div>
+
+    <!-- Summary Cards (from /api/insights) -->
+    <div class="metrics-grid" id="summary-cards">
+      <div class="metric-card tilt">
+        <div class="metric-label">Total Products</div>
+        <div class="metric-value" id="kpi-total-products">–</div>
+        <div class="metric-subtext">Items in your catalog</div>
+      </div>
+
+      <div class="metric-card tilt">
+        <div class="metric-label">Expiring Soon</div>
+        <div class="metric-value" id="kpi-expiring" style="color: var(--warning-text);">–</div>
+        <div class="metric-subtext" id="kpi-expiring-subtext">Within the next 7 days</div>
+      </div>
+
+      <div class="metric-card tilt">
+        <div class="metric-label">Underperforming</div>
+        <div class="metric-value" id="kpi-underperforming" style="color: var(--danger-text);">–</div>
+        <div class="metric-subtext">Slow movers below 10% sell-through</div>
+      </div>
+    </div>
+
+    <!-- Attention Panels -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Expiring Soon (next 7 days)</h2>
+          <a href="/insights.html" class="btn btn-sm">Details</a>
+        </div>
+        <div class="panel-body" id="dash-expiring-list">
+          <div class="empty-state">Loading…</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Underperforming Items</h2>
+          <a href="/insights.html" class="btn btn-sm">Details</a>
+        </div>
+        <div class="panel-body" id="dash-underperforming-list">
+          <div class="empty-state">Loading…</div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-container">
+      <span>EcoInventery &copy; 2026 — Live Seller Dashboard</span>
+      <span class="badge badge-neutral">Synced with live inventory</span>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    async function loadDashboard() {
+      document.getElementById('btn-refresh').setAttribute('disabled', 'true');
+      try {
+        const res = await API.get('/api/insights');
+        const { totalProducts, expiringSoon, underperforming } = res.data;
+
+        document.getElementById('kpi-total-products').textContent = totalProducts;
+        document.getElementById('kpi-expiring').textContent = expiringSoon.length;
+        document.getElementById('kpi-underperforming').textContent = underperforming.length;
+
+        const expBox = document.getElementById('dash-expiring-list');
+        if (expiringSoon.length === 0) {
+          expBox.innerHTML = '<div class="empty-state">Nothing expiring in the next 7 days. Well stocked.</div>';
+        } else {
+          expBox.innerHTML = expiringSoon.slice(0, 5).map(item => `
+            <div style="border-bottom: 1px solid var(--border-light); padding-bottom: 10px; margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; gap: 8px;">
+                <strong>${esc(item.name)}</strong>
+                <span class="badge ${item.daysLeft < 0 ? 'badge-danger' : 'badge-warning'}">${item.daysLeft < 0 ? 'Expired' : item.daysLeft + 'd left'}</span>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 3px;">${esc(item.reason)}</div>
+            </div>
+          `).join('');
+        }
+
+        const undBox = document.getElementById('dash-underperforming-list');
+        if (underperforming.length === 0) {
+          undBox.innerHTML = '<div class="empty-state">No slow movers flagged. Turnover is healthy.</div>';
+        } else {
+          undBox.innerHTML = underperforming.slice(0, 5).map(item => `
+            <div style="border-bottom: 1px solid var(--border-light); padding-bottom: 10px; margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; gap: 8px;">
+                <strong>${esc(item.name)}</strong>
+                <span class="badge badge-danger">${item.sellThroughPct}% sold</span>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 3px;">${esc(item.reason)}</div>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        showToast('Error loading dashboard: ' + err.message, 'danger');
+      } finally {
+        const btn = document.getElementById('btn-refresh');
+        btn.textContent = '↻ Refresh';
+        btn.removeAttribute('disabled');
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

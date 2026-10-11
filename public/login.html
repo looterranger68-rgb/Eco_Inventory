@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — EcoInventery</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-container">
+      <a href="/index.html" class="brand-wrapper">
+        <span class="brand-mark"></span>
+        <span class="brand-title">EcoInventery</span>
+      </a>
+      <nav class="main-nav">
+        <a href="/index.html" class="nav-link">Home</a>
+        <a href="/register.html" class="nav-link">Create Account</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="app-container">
+    <div class="auth-container">
+      <div class="auth-header">
+        <h1 class="auth-title">Seller Sign In</h1>
+        <p class="auth-desc">Enter your credentials to access your store inventory.</p>
+      </div>
+
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="login-email">Work Email</label>
+          <input type="email" id="login-email" class="input-control" value="seller@ecoinventery.com" required style="width: 100%;">
+        </div>
+
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" class="input-control" value="demo1234" required style="width: 100%;">
+        </div>
+
+        <div style="margin-top: 20px;">
+          <button type="submit" class="btn btn-dark" style="width: 100%;" id="btn-login">Sign In &rarr;</button>
+        </div>
+      </form>
+
+      <div style="margin-top: 18px; text-align: center; font-size: 0.82rem; color: var(--text-secondary);">
+        Don't have an account? <a href="/register.html" style="color: var(--accent); font-weight: 500;">Register here</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-container">
+      <span>EcoInventery &copy; 2026</span>
+      <span class="badge badge-neutral">Demo Login: seller@ecoinventery.com / demo1234</span>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+  <script>
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const btn = document.getElementById('btn-login');
+
+      btn.textContent = 'Authenticating...';
+      btn.setAttribute('disabled', 'true');
+
+      try {
+        await API.post('/api/auth/login', { email, password });
+        showToast('Authentication successful', 'success');
+        setTimeout(() => {
+          window.location.href = '/dashboard.html';
+        }, 300);
+      } catch (err) {
+        showToast(err.message, 'danger');
+      } finally {
+        btn.textContent = 'Sign In →';
+        btn.removeAttribute('disabled');
+      }
+    }
+  </script>
+</body>
+</html>

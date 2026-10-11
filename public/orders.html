@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orders & Stock Transactions — EcoInventory</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="site-header">
+    <div class="header-container">
+      <a href="/index.html" class="brand-wrapper">
+        <span class="brand-mark"></span>
+        <span class="brand-title">EcoInventory</span>
+        <span class="brand-tag">Orders</span>
+      </a>
+
+      <nav class="main-nav">
+        <a href="/index.html" class="nav-link">Dashboard</a>
+        <a href="/inventory.html" class="nav-link">Inventory</a>
+        <a href="/ai-insights.html" class="nav-link">AI Copilot</a>
+        <a href="/orders.html" class="nav-link active">Orders</a>
+        <a href="/suppliers.html" class="nav-link">Suppliers</a>
+        <a href="/settings.html" class="nav-link">Settings</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="btn btn-sm btn-dark" onclick="openOrderModal('sale')">+ New Customer Sale</button>
+        <button class="btn btn-sm btn-primary" onclick="openOrderModal('purchase')">+ Restock Purchase PO</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+    <div class="page-header">
+      <div class="page-title-group">
+        <h1>Transactions & Order Ledger</h1>
+        <p>Customer fulfillment sales, inbound supplier purchase orders, and automatic real-time stock deductions.</p>
+      </div>
+      <div class="page-actions">
+        <select id="type-filter" class="select-control" onchange="fetchOrders()">
+          <option value="">All Transaction Types</option>
+          <option value="sale">Customer Sales</option>
+          <option value="purchase">Supplier Purchase Orders (PO)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Order #</th>
+            <th>Type</th>
+            <th>Customer / Vendor</th>
+            <th>Line Items</th>
+            <th class="col-numeric">Total Amount</th>
+            <th>Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="orders-tbody">
+          <tr><td colspan="7" class="empty-state">Loading order transactions...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Modal: Create Order -->
+  <div id="order-modal" class="modal-backdrop">
+    <div class="modal-window" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="order-modal-title">Create New Transaction</h3>
+        <button class="modal-close" onclick="closeModal('order-modal')">&times;</button>
+      </div>
+      <form id="order-form" onsubmit="handleOrderSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="order-type" value="sale">
+          
+          <div class="form-group">
+            <label for="order-party" id="order-party-label">Customer Name / Channel *</label>
+            <input type="text" id="order-party" class="input-control" required placeholder="e.g. Etsy Order #5102 or Sarah Jenkins">
+          </div>
+
+          <!-- Line items builder -->
+          <div class="form-group">
+            <label>Order Item Selection *</label>
+            <div id="order-items-list" style="display: flex; flex-direction: column; gap: 10px;">
+              <!-- Row 1 -->
+              <div class="form-row order-item-row">
+                <select class="select-control order-prod-select" required style="width: 100%;">
+                  <option value="">Select product...</option>
+                </select>
+                <div style="display: flex; gap: 6px;">
+                  <input type="number" class="input-control order-qty-input col-mono" value="1" min="1" placeholder="Qty" style="width: 70px;" required>
+                  <input type="number" step="0.01" class="input-control order-price-input col-mono" placeholder="Price $" style="width: 100px;" required>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm" style="margin-top: 10px;" onclick="addOrderItemRow()">+ Add Another Line Item</button>
+          </div>
+
+          <div class="form-group">
+            <label for="order-notes">Notes / Tracking #</label>
+            <input type="text" id="order-notes" class="input-control" placeholder="Optional reference notes">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" onclick="closeModal('order-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="order-submit-btn">Complete & Record Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <span>EcoInventory &copy; 2026 — Transaction System</span>
+      <span class="badge badge-neutral">Inventory Auto-Sync Active</span>
+    </div>
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script>
+    let catalogProducts = [];
+
+    async function initOrders() {
+      await loadCatalog();
+      await fetchOrders();
+    }
+
+    async function loadCatalog() {
+      try {
+        const res = await API.get('/api/products');
+        catalogProducts = res.data || [];
+        populateSelectOptions(document.querySelector('.order-prod-select'));
+      } catch (err) {
+        console.error('Failed to load products for order form:', err);
+      }
+    }
+
+    function populateSelectOptions(selectEl) {
+      if (!selectEl) return;
+      const type = document.getElementById('order-type').value;
+      selectEl.innerHTML = '<option value="">Select product...</option>' + 
+        catalogProducts.map(p => `
+          <option value="${p.id}" data-cost="${p.cost_price}" data-price="${p.selling_price}" data-stock="${p.quantity}">
+            ${p.sku} - ${p.name} (Stock: ${p.quantity})
+          </option>
+        `).join('');
+
+      selectEl.addEventListener('change', (e) => {
+        const selected = e.target.options[e.target.selectedIndex];
+        const row = e.target.closest('.order-item-row');
+        const priceInput = row.querySelector('.order-price-input');
+        if (selected && priceInput) {
+          const defaultPrice = type === 'sale' ? selected.dataset.price : selected.dataset.cost;
+          priceInput.value = defaultPrice || '0.00';
+        }
+      });
+    }
+
+    function addOrderItemRow() {
+      const container = document.getElementById('order-items-list');
+      const newRow = document.createElement('div');
+      newRow.className = 'form-row order-item-row';
+      newRow.innerHTML = `
+        <select class="select-control order-prod-select" required style="width: 100%;">
+          <option value="">Select product...</option>
+        </select>
+        <div style="display: flex; gap: 6px;">
+          <input type="number" class="input-control order-qty-input col-mono" value="1" min="1" placeholder="Qty" style="width: 70px;" required>
+          <input type="number" step="0.01" class="input-control order-price-input col-mono" placeholder="Price $" style="width: 100px;" required>
+          <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.order-item-row').remove()">&times;</button>
+        </div>
+      `;
+      container.appendChild(newRow);
+      populateSelectOptions(newRow.querySelector('.order-prod-select'));
+    }
+
+    async function fetchOrders() {
+      try {
+        const type = document.getElementById('type-filter').value;
+        const res = await API.get('/api/orders' + (type ? `?type=${type}` : ''));
+        renderOrders(res.data || []);
+      } catch (err) {
+        showToast('Error fetching orders: ' + err.message, 'danger');
+      }
+    }
+
+    function renderOrders(orders) {
+      const tbody = document.getElementById('orders-tbody');
+      if (orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No order transactions recorded yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = orders.map(ord => {
+        const isSale = ord.type === 'sale';
+        const itemsSummary = (ord.items || []).map(i => `${i.quantity}x ${i.sku || ('#' + i.product_id)}`).join(', ');
+
+        return `
+          <tr>
+            <td class="col-mono" style="font-weight: 600;">${ord.order_number}</td>
+            <td><span class="badge ${isSale ? 'badge-success' : 'badge-neutral'}">${isSale ? 'Sale' : 'Purchase PO'}</span></td>
+            <td style="font-weight: 500;">${ord.customer_or_vendor}</td>
+            <td style="font-size: 0.84rem; color: var(--text-secondary); max-width: 320px;">${itemsSummary || '—'}</td>
+            <td class="col-numeric col-mono" style="font-weight: 600;">${formatCurrency(ord.total_amount)}</td>
+            <td style="font-size: 0.82rem; color: var(--text-muted);">${formatDate(ord.created_at)}</td>
+            <td><span class="badge badge-neutral">${ord.status}</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openOrderModal(type) {
+      document.getElementById('order-type').value = type;
+      document.getElementById('order-modal-title').textContent = type === 'sale' ? 'Record Customer Sale' : 'Create Inbound Supplier Purchase Order';
+      document.getElementById('order-party-label').textContent = type === 'sale' ? 'Customer Name / Order Source *' : 'Supplier / Vendor Name *';
+      document.getElementById('order-form').reset();
+      
+      // Reset items to 1 row
+      const list = document.getElementById('order-items-list');
+      list.innerHTML = `
+        <div class="form-row order-item-row">
+          <select class="select-control order-prod-select" required style="width: 100%;">
+            <option value="">Select product...</option>
+          </select>
+          <div style="display: flex; gap: 6px;">
+            <input type="number" class="input-control order-qty-input col-mono" value="1" min="1" placeholder="Qty" style="width: 70px;" required>
+            <input type="number" step="0.01" class="input-control order-price-input col-mono" placeholder="Price $" style="width: 100px;" required>
+          </div>
+        </div>
+      `;
+      populateSelectOptions(list.querySelector('.order-prod-select'));
+      openModal('order-modal');
+    }
+
+    async function handleOrderSubmit(e) {
+      e.preventDefault();
+      const type = document.getElementById('order-type').value;
+      const customerOrVendor = document.getElementById('order-party').value;
+      const notes = document.getElementById('order-notes').value;
+
+      const rows = document.querySelectorAll('.order-item-row');
+      const items = [];
+
+      for (const r of rows) {
+        const select = r.querySelector('.order-prod-select');
+        const qtyInput = r.querySelector('.order-qty-input');
+        const priceInput = r.querySelector('.order-price-input');
+
+        if (select.value) {
+          items.push({
+            product_id: parseInt(select.value, 10),
+            quantity: parseInt(qtyInput.value, 10) || 1,
+            unit_price: parseFloat(priceInput.value) || 0.0
+          });
+        }
+      }
+
+      if (items.length === 0) {
+        showToast('Please select at least one item.', 'danger');
+        return;
+      }
+
+      try {
+        await API.post('/api/orders', {
+          type,
+          customer_or_vendor: customerOrVendor,
+          items,
+          notes
+        });
+        showToast(`${type === 'sale' ? 'Sale recorded' : 'Purchase order created'} and stock synchronized.`, 'success');
+        closeModal('order-modal');
+        await loadCatalog();
+        await fetchOrders();
+      } catch (err) {
+        showToast('Order creation failed: ' + err.message, 'danger');
+      }
+    }
+
+    initOrders();
+  </script>
+</body>
+</html>

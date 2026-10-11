@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings & Config — EcoInventory</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="site-header">
+    <div class="header-container">
+      <a href="/index.html" class="brand-wrapper">
+        <span class="brand-mark"></span>
+        <span class="brand-title">EcoInventory</span>
+        <span class="brand-tag">Settings</span>
+      </a>
+
+      <nav class="main-nav">
+        <a href="/index.html" class="nav-link">Dashboard</a>
+        <a href="/inventory.html" class="nav-link">Inventory</a>
+        <a href="/ai-insights.html" class="nav-link">AI Copilot</a>
+        <a href="/orders.html" class="nav-link">Orders</a>
+        <a href="/suppliers.html" class="nav-link">Suppliers</a>
+        <a href="/settings.html" class="nav-link active">Settings</a>
+      </nav>
+
+      <div class="header-actions">
+        <button type="submit" form="settings-form" class="btn btn-sm btn-primary">Save Settings</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container" style="max-width: 800px;">
+    <div class="page-header">
+      <div class="page-title-group">
+        <h1>Store & System Configuration</h1>
+        <p>Merchant identity, currency thresholds, and Gemini AI key management.</p>
+      </div>
+    </div>
+
+    <form id="settings-form" onsubmit="handleSaveSettings(event)">
+      <!-- Store Settings -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Store Identity & Display</h2>
+        </div>
+        <div class="panel-body">
+          <div class="form-group">
+            <label for="set-store-name">Store / Brand Name</label>
+            <input type="text" id="set-store-name" class="input-control" value="EcoInventory Sustainable Goods" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="set-currency">Store Currency Code</label>
+              <input type="text" id="set-currency" class="input-control" value="USD">
+            </div>
+            <div class="form-group">
+              <label for="set-currency-symbol">Currency Symbol</label>
+              <input type="text" id="set-currency-symbol" class="input-control" value="$">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="set-threshold">Default Global Low Stock Alert Threshold</label>
+            <input type="number" id="set-threshold" class="input-control col-mono" value="15" min="1">
+            <small style="font-size: 0.76rem; color: var(--text-muted); display: block; margin-top: 4px;">Applied when individual SKU threshold is unspecified.</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Configuration -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">AI Engine & Model Configuration</h2>
+          <span id="ai-status-badge" class="badge badge-neutral">Checking status...</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-group">
+            <label for="set-gemini-key">Google Gemini API Key</label>
+            <input type="password" id="set-gemini-key" class="input-control input-mono" placeholder="Enter Gemini API key to enable live cloud reasoning...">
+            <small style="font-size: 0.76rem; color: var(--text-muted); display: block; margin-top: 4px;">
+              EcoInventory uses hybrid intelligence: when no key is supplied, a deterministic supply chain intelligence engine calculates restocking safety margins, burn rates, and deadstock alerts automatically.
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Database & Architecture Info -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Database & Environment</h2>
+        </div>
+        <div class="panel-body">
+          <div style="font-size: 0.88rem; display: flex; flex-direction: column; gap: 8px;">
+            <div><strong>Database Engine:</strong> <span id="env-db-type" class="badge badge-neutral">SQLite / PostgreSQL</span></div>
+            <div><strong>Server Environment:</strong> <span class="col-mono">Node.js Express REST API</span></div>
+            <div><strong>Frontend Stack:</strong> <span class="col-mono">Semantic HTML, Pure CSS, Vanilla JS</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <span>EcoInventory &copy; 2026</span>
+      <span class="badge badge-neutral">Configuration Saved</span>
+    </div>
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script>
+    async function loadSettings() {
+      try {
+        const res = await API.get('/api/dashboard/settings');
+        const s = res.data;
+
+        if (s.store_name) document.getElementById('set-store-name').value = s.store_name;
+        if (s.currency) document.getElementById('set-currency').value = s.currency;
+        if (s.currency_symbol) document.getElementById('set-currency-symbol').value = s.currency_symbol;
+        if (s.low_stock_global_threshold) document.getElementById('set-threshold').value = s.low_stock_global_threshold;
+
+        const aiBadge = document.getElementById('ai-status-badge');
+        if (s.has_gemini_key) {
+          aiBadge.className = 'badge badge-success';
+          aiBadge.textContent = 'Gemini 1.5 Connected (' + s.gemini_api_key_masked + ')';
+        } else {
+          aiBadge.className = 'badge badge-neutral';
+          aiBadge.textContent = 'Deterministic Local Engine Active';
+        }
+
+        // Check health
+        const health = await API.get('/api/health');
+        document.getElementById('env-db-type').textContent = health.database_type.toUpperCase();
+
+      } catch (err) {
+        showToast('Error loading settings: ' + err.message, 'danger');
+      }
+    }
+
+    async function handleSaveSettings(e) {
+      e.preventDefault();
+      const payload = {
+        store_name: document.getElementById('set-store-name').value,
+        currency: document.getElementById('set-currency').value,
+        currency_symbol: document.getElementById('set-currency-symbol').value,
+        low_stock_global_threshold: parseInt(document.getElementById('set-threshold').value, 10) || 15
+      };
+
+      const apiKey = document.getElementById('set-gemini-key').value;
+      if (apiKey && apiKey.trim().length > 0) {
+        payload.gemini_api_key = apiKey.trim();
+      }
+
+      try {
+        await API.post('/api/dashboard/settings', payload);
+        showToast('Settings saved successfully', 'success');
+        document.getElementById('set-gemini-key').value = '';
+        await loadSettings();
+      } catch (err) {
+        showToast('Error saving settings: ' + err.message, 'danger');
+      }
+    }
+
+    loadSettings();
+  </script>
+</body>
+</html>
