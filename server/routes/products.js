@@ -8,6 +8,13 @@ const { requireAuth } = require('../middleware/auth');
 
 const QR_DIR = path.join(__dirname, '../../public/qr');
 const DEFAULT_BASE_URL = `http://localhost:${process.env.PORT || 3000}`;
+let lastQrBaseUrl = null;
+const QR_OPTIONS = {
+  type: 'png',
+  width: 512,
+  margin: 2,
+  errorCorrectionLevel: 'M'
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,6 +52,26 @@ function parseNumber(value, field, { min = null, integer = false } = {}) {
 
 function slugify(text) {
   return String(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'product';
+}
+
+function getPublicBaseUrl(req) {
+  if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/+$/, '');
+
+  const protocol = (req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim();
+  const host = (req.get('x-forwarded-host') || req.get('host') || '').split(',')[0].trim();
+  if (!host || !['http', 'https'].includes(protocol)) return DEFAULT_BASE_URL;
+  return `${protocol}://${host}`;
+}
+
+async function ensureQrFile(slug, baseUrl, force = false) {
+  if (!/^[a-z0-9-]+$/.test(slug)) throw new Error('Invalid product slug for QR generation.');
+
+  const filePath = path.join(QR_DIR, `${slug}.png`);
+  if (!force && fs.existsSync(filePath)) return filePath;
+
+  fs.mkdirSync(QR_DIR, { recursive: true });
+  await QRCode.toFile(filePath, `${baseUrl}/p/${slug}`, QR_OPTIONS);
+  return filePath;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +178,21 @@ router.get('/', requireAuth, async (req, res) => {
        FROM products WHERE seller_id = $1 ORDER BY id DESC`,
       [req.seller.id]
     );
+
+    const baseUrl = getPublicBaseUrl(req);
+    const refreshQrCodes = lastQrBaseUrl !== baseUrl;
+    let qrRefreshFailed = false;
+    for (const product of products) {
+      if (!product.qr_code_path || !product.slug) continue;
+      try {
+        await ensureQrFile(product.slug, baseUrl, refreshQrCodes);
+      } catch (err) {
+        qrRefreshFailed = true;
+        console.error(`QR image generation failed for product ${product.id}:`, err.message);
+      }
+    }
+    if (!qrRefreshFailed) lastQrBaseUrl = baseUrl;
+
     return res.json({ success: true, count: products.length, data: products });
   } catch (err) {
     console.error('Product list error:', err);
@@ -209,17 +251,10 @@ router.post('/:id/generate-qr', requireAuth, async (req, res) => {
     if (!product) return sendError(res, 404, 'Product not found.');
 
     const slug = product.slug;
-    const baseUrl = process.env.BASE_URL || DEFAULT_BASE_URL;
-    const targetUrl = `${baseUrl.replace(/\/+$/, '')}/p/${slug}`;
+    const baseUrl = getPublicBaseUrl(req);
+    const targetUrl = `${baseUrl}/p/${slug}`;
 
-    if (!fs.existsSync(QR_DIR)) fs.mkdirSync(QR_DIR, { recursive: true });
-    const filePath = path.join(QR_DIR, `${slug}.png`);
-    await QRCode.toFile(filePath, targetUrl, {
-      type: 'png',
-      width: 512,
-      margin: 2,
-      errorCorrectionLevel: 'M'
-    });
+    await ensureQrFile(slug, baseUrl, true);
 
     const qrPath = `/qr/${slug}.png`;
     await db.run('UPDATE products SET qr_code_path = $1 WHERE id = $2', [qrPath, id]);

@@ -4,7 +4,10 @@ const db = require('../db');
 const { stringify } = require('csv-stringify/sync');
 const { parse } = require('csv-parse/sync');
 const multer = require('multer');
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 }
+});
 
 // GET all products with optional query filtering
 router.get('/products', async (req, res) => {
