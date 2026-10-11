@@ -1,0 +1,15 @@
+# Environment & secrets
+.env
+
+# Dependencies
+node_modules/
+
+# Local SQLite database
+data/
+
+# Generated QR code images
+public/qr/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
