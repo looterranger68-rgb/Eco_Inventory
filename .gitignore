@@ -4,8 +4,9 @@
 # Dependencies
 node_modules/
 
-# Local SQLite database
-data/
+# Local SQLite database (track only the sanitized demo snapshot)
+data/*
+!data/ecoinventory.db
 
 # Generated QR code images
 public/qr/
