@@ -3,12 +3,7 @@ const router = express.Router();
 const db = require('./db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required. Set it in your .env file or environment before starting the server.');
-}
+const JWT_SECRET = require('./lib/jwtSecret');
 
 // Middleware to authenticate token (optional for demo / lenient)
 function authMiddleware(req, res, next) {
